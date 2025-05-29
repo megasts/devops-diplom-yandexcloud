@@ -1,0 +1,27 @@
+[masters]
+
+%{~ for i in masters ~}
+%{~ if "${i.network_interface.0.nat_ip_address}" == "" ~}
+${i["name"]}   ansible_host=${i["network_interface"][0]["ip_address"]} fqdn=${i["fqdn"]}
+%{else}
+${i["name"]}   ansible_host=${i["network_interface"][0]["nat_ip_address"]} ip=${i["network_interface"][0]["ip_address"]} fqdn=${i["fqdn"]}
+%{~ endif ~}
+%{endfor ~}
+
+
+[workers]
+
+%{~ for i in workers ~}
+%{~ if "${i.network_interface.0.nat_ip_address}" == "" ~}
+${i["name"]}   ansible_host=${i["network_interface"][0]["ip_address"]} fqdn=${i["fqdn"]}
+%{else}
+${i["name"]}   ansible_host=${i["network_interface"][0]["nat_ip_address"]} ip=${i["network_interface"][0]["ip_address"]} fqdn=${i["fqdn"]}
+%{~ endif ~}
+%{~ endfor ~}
+%{~ for i in workersip ~}
+%{~ if "${i.network_interface.0.nat_ip_address}" == "" ~}
+${i["name"]}   ansible_host=${i["network_interface"][0]["ip_address"]} fqdn=${i["fqdn"]}
+%{else}
+${i["name"]}   ansible_host=${i["network_interface"][0]["nat_ip_address"]} ip=${i["network_interface"][0]["ip_address"]} fqdn=${i["fqdn"]}
+%{~ endif ~}
+%{endfor ~}

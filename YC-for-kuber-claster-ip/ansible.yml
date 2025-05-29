@@ -1,0 +1,137 @@
+---
+- name: kuder
+  gather_facts: false
+  hosts: master-1
+  vars:
+    ansible_ssh_user: '{{ host_user_name }}'
+  environment:
+    ANSIBLE_CONFIG: /home/{{ ansible_ssh_user }}/kubespray/ansible.cfg
+  
+  pre_tasks:
+    - name: Validating the ssh port is open and
+      wait_for:
+        host: '{{ ansible_host }}'
+        port: 22
+        delay: 5
+        timeout: 300
+        state: started
+        search_regex: OpenSSH
+  
+  tasks:
+
+    - name: Update system packages and clean up befor install
+      become: yes
+      ansible.builtin.shell: apt-get update && apt-get upgrade -y
+    
+    - name: install dependencies
+      become: yes
+      apt:
+        name: "{{ item }}"
+        state: present
+        update_cache: yes
+      loop:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - snapd
+        - git
+        - python3.12
+        - python3-pip
+        - python3.12-venv
+    
+    - name: Update system packages and clean up after install
+      become: yes
+      ansible.builtin.shell: apt-get upgrade -y && apt-get clean
+
+    - name: Clone a repo with separate git directory
+      ansible.builtin.git:
+        repo: 'https://github.com/kubernetes-incubator/kubespray.git'
+        dest: $HOME/kubespray
+        version: release-2.28
+
+    - name: install requirements
+      ansible.builtin.pip:
+        requirements: $HOME/kubespray/requirements.txt 
+        virtualenv: $HOME/kubespray/.venv
+        virtualenv_command: "python3 -m venv"
+
+    - name: copy sample with command
+      command: cp -rfp $HOME/kubespray/inventory/sample $HOME/kubespray/inventory/mycluster
+
+    - name: copy myinventory in inventory
+      ansible.builtin.copy:
+        src: ~/Projects/Diplom/YC-for-kuber-claster-ip/myinventory.ini
+        dest: $HOME/kubespray/inventory/mycluster/
+        force: yes
+    
+    - name: Rename cluster
+      replace:
+        path: '$HOME/kubespray/inventory/mycluster/group_vars/k8s_cluster/k8s-cluster.yml'
+        regexp: '^cluster_name: cluster.local$'
+        replace: 'cluster_name: k8s.local'
+    
+    - name: Add ip in_ssl_keys
+      replace:
+        path: '$HOME/kubespray/inventory/mycluster/group_vars/k8s_cluster/k8s-cluster.yml'
+        regexp: '^# supplementary_addresses_in_ssl_keys:.*$'
+        replace: 'supplementary_addresses_in_ssl_keys: [{{ ansible_host }}]'
+
+    - name: enable ingress_nginx
+      replace:
+        path: '$HOME/kubespray/inventory/mycluster/group_vars/k8s_cluster/addons.yml'
+        regexp: '^ingress_nginx_enabled:.*$'
+        replace: 'ingress_nginx_enabled: enable'
+    
+    - name: apply nginx_service_type NodePort
+      replace:
+        path: '$HOME/kubespray/inventory/mycluster/group_vars/k8s_cluster/addons.yml'
+        regexp: '^# ingress_nginx_service_type:.*$'
+        replace: 'ingress_nginx_service_type: NodePort'
+
+    - name: copy key
+      ansible.builtin.copy:
+        src: ~/.ssh/id_ed25519
+        dest: $HOME/.ssh/
+        mode: "0600"
+        force: yes
+    
+    - name: run install k8s claster
+      ansible.builtin.command:
+        cmd: '$HOME/kubespray/.venv/bin/ansible-playbook -i $HOME/kubespray/inventory/mycluster/myinventory.ini $HOME/kubespray/cluster.yml -u {{ ansible_ssh_user }} -b -v'
+
+    - name: create directory
+      ansible.builtin.file:
+        path: ~/.kube/
+        state: directory
+
+    - name: copy config with command
+      become: yes
+      command: cp -rfp /etc/kubernetes/admin.conf /home/{{ ansible_ssh_user }}/.kube/config
+    
+    - name: copy in config
+      become: yes
+      ansible.builtin.file:
+        path: /home/{{ ansible_ssh_user }}/.kube/config
+        owner: '{{ ansible_ssh_user }}'
+        group: '{{ ansible_ssh_user }}'
+        mode: '0600'
+
+    - name: copy in config for remove
+      ansible.builtin.command:
+        cmd: cp -rfp $HOME/.kube/config $HOME/.kube/config_cp
+
+    - name: change IP address in config
+      ansible.builtin.lineinfile:
+        path: $HOME/.kube/config_cp
+        search_string: "server: https://"
+        line: "    server: https://{{ ansible_host }}:6443"
+
+    - name: copy config to local
+      ansible.builtin.fetch:
+        src: $HOME/.kube/config_cp
+        dest: ~/.kube/config
+        flat: yes
+    
+    - name: echo2
+      ansible.builtin.debug:
+        msg: "ssh -o 'StrictHostKeyChecking=no' {{ host_user_name }}@{{ ansible_host }}"

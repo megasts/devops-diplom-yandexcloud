@@ -1,0 +1,63 @@
+---
+- name: kuder5
+  gather_facts: false
+  hosts: master-1
+  vars:
+#    ansible_ssh_user: "{{ username_ssh_user }}"
+    ansible_ssh_user: ubuntu
+  environment:
+    ANSIBLE_CONFIG: /home/{{ ansible_ssh_user }}/kubespray/ansible.cfg
+
+  tasks:
+    # - name: Echo my_env_var
+    #   shell: ANSIBLE_CONFIG
+    #   environment:
+    #     MY_ENV_VARIABLE: $HOME/kubespray/ansible.cfg
+
+    - name: Echo my_env_var again
+      shell: "echo $ANSIBLE_CONFIG"
+
+    - name:
+      ansible.builtin.command:
+        cmd: curl ifconfig.me
+    
+    - name: run bash
+      ansible.builtin.command:
+        cmd: '$HOME/kubespray/.venv/bin/ansible-playbook -i $HOME/kubespray/inventory/mycluster/myinventory.ini $HOME/kubespray/cluster.yml -u {{ ansible_ssh_user }} -b -vvv'
+
+    - name: echo2
+      ansible.builtin.debug:
+        msg: "ssh -o 'StrictHostKeyChecking=no' {{ ansible_ssh_user }}@{{ ansible_host }}"
+
+    - name: create directory
+      ansible.builtin.file:
+        path: ~/.kube/
+        state: directory
+      # when: stat_dir_config.stat.exists == false
+
+    - name: copy config with command
+      become: yes
+      command: cp -rfp /etc/kubernetes/admin.conf /home/{{ ansible_ssh_user }}/.kube/config
+    
+    - name: copy in config
+      become: yes
+      ansible.builtin.file:
+        path: /home/{{ ansible_ssh_user }}/.kube/config
+        owner: '{{ ansible_ssh_user }}'
+        group: '{{ ansible_ssh_user }}'
+        mode: '0600'
+
+    - name: copy in config for remove
+      command: cp -rfp /home/{{ ansible_ssh_user }}/.kube/config /home/{{ ansible_ssh_user }}/.kube/config_cp
+
+    - name: change IP address in config
+      ansible.builtin.lineinfile:
+        path: /home/{{ ansible_ssh_user }}/.kube/config_cp
+        search_string: "server: https://"
+        line: "    server: https://{{ ansible_host }}:6443"
+
+    - name: copy config to local
+      ansible.builtin.fetch:
+        src: /home/{{ ansible_ssh_user }}/.kube/config_cp
+        dest: ~/.kube/config
+        flat: yes

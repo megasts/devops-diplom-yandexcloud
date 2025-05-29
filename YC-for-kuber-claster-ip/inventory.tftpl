@@ -1,0 +1,63 @@
+%{~ for i in masters ~}
+%{~ if "${i.network_interface.0.nat_ip_address}" == "" ~}
+${i["name"]}   ip=${i["network_interface"][0]["ip_address"]}
+%{else}
+${i["name"]}   ansible_host=${i["network_interface"][0]["nat_ip_address"]} ip=${i["network_interface"][0]["ip_address"]}
+%{~ endif ~}
+%{endfor ~}
+%{~ for i in workers ~}
+%{~ if "${i.network_interface.0.nat_ip_address}" == "" ~}
+${i["name"]}   ip=${i["network_interface"][0]["ip_address"]}
+%{else}
+${i["name"]}   ansible_host=${i["network_interface"][0]["nat_ip_address"]} ip=${i["network_interface"][0]["ip_address"]}
+%{~ endif ~}
+%{endfor ~}
+%{~ for i in workersip ~}
+%{~ if "${i.network_interface.0.nat_ip_address}" == "" ~}
+${i["name"]}   ip=${i["network_interface"][0]["ip_address"]}
+%{else}
+${i["name"]}   ansible_host=${i["network_interface"][0]["nat_ip_address"]} ip=${i["network_interface"][0]["ip_address"]}
+%{~ endif ~}
+%{endfor}
+
+[kube_control_plane]
+
+%{~ if "${masters[0].network_interface.0.nat_ip_address}" == "" ~}
+${masters[0]["name"]}   ip=${masters[0]["network_interface"][0]["ip_address"]}
+%{else}
+${masters[0]["name"]}   ansible_host=${masters[0]["network_interface"][0]["nat_ip_address"]} ip=${masters[0]["network_interface"][0]["ip_address"]}
+%{~ endif}
+
+[etcd]
+
+%{~ for i in range(etcd_count) ~}
+%{~ if "${masters[i].network_interface.0.nat_ip_address}" == "" ~}
+${masters[i]["name"]}   ip=${masters[i]["network_interface"][0]["ip_address"]}
+%{else}
+${masters[i]["name"]}   ansible_host=${masters[i]["network_interface"][0]["nat_ip_address"]} ip=${masters[i]["network_interface"][0]["ip_address"]}
+%{~ endif ~}
+%{endfor }
+
+[kube_node]
+
+%{~ for i in workers ~}
+%{~ if "${i.network_interface.0.nat_ip_address}" == "" ~}
+${i["name"]}   ip=${i["network_interface"][0]["ip_address"]}
+%{else}
+${i["name"]}   ansible_host=${i["network_interface"][0]["nat_ip_address"]} ip=${i["network_interface"][0]["ip_address"]}
+%{~ endif ~}
+%{endfor ~}
+%{~ for i in workersip ~}
+%{~ if "${i.network_interface.0.nat_ip_address}" == "" ~}
+${i["name"]}   ip=${i["network_interface"][0]["ip_address"]}
+%{else}
+${i["name"]}   ansible_host=${i["network_interface"][0]["nat_ip_address"]} ip=${i["network_interface"][0]["ip_address"]}
+%{~ endif ~}
+%{endfor}
+
+
+[k8s_claster:children]
+kube_control_plane
+kube_node
+
+[calico_rr]
